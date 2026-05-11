@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>喵不可言：魚骨行動</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#0a0a0f;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  min-height:100vh;
+  font-family:'Microsoft JhengHei', sans-serif;
+  overflow:hidden; user-select:none;
+}
+#title { color:#ff6b35; font-size:24px; font-weight:bold; margin-bottom:6px;
+  text-shadow:0 0 20px rgba(255,107,53,0.7); letter-spacing:3px; }
+#subtitle { color:#777; font-size:12px; margin-bottom:10px; letter-spacing:2px; }
+#gameWrapper { display:flex; gap:14px; align-items:flex-start; }
+canvas { display:block; border:2px solid #ff6b35; border-radius:4px;
+  box-shadow:0 0 30px rgba(255,107,53,0.4), 0 0 80px rgba(255,107,53,0.1); }
+#panel {
+  color:#ddd; width:155px; font-size:12px; line-height:1.85;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,107,53,0.25); border-radius:8px; padding:12px;
+}
+#panel h3 { color:#ff6b35; font-size:13px; margin-bottom:6px;
+  border-bottom:1px solid rgba(255,107,53,0.25); padding-bottom:5px; }
+.key { display:inline-block; background:rgba(255,107,53,0.15);
+  border:1px solid #ff6b35; border-radius:3px; padding:0 5px;
+  font-size:10px; color:#ff6b35; }
+#panel .tip { color:#888; font-size:11px; margin-top:4px; }
+</style>
+</head>
+<body>
+<div id="title">喵不可言：魚骨行動</div>
+<div id="subtitle">MEOW UNSPEAKABLE · FISHBONE OPERATION</div>
+<div id="gameWrapper">
+  <canvas id="game" width="420" height="620"></canvas>
+  <div id="panel">
+    <h3>🎮 操作</h3>
+    <div><span class="key">←→↑↓</span> 移動</div>
+    <div><span class="key">Z</span> 發射魚骨</div>
+    <div><span class="key">空白鍵</span> 撕咬</div>
+    <div><span class="key">P</span> 暫停</div>
+    <div><span class="key">Enter</span> 重新開始</div>
+    <br>
+    <h3>🎯 道具</h3>
+    <div>🥩 鼠肉 → 經驗值</div>
+    <div>🥛 牛奶 → 無敵狂暴</div>
+    <div>🥫 罐頭 → 保護生命</div>
+    <br>
+    <h3>⚔️ 成長</h3>
+    <div>Lv3 → 雙發齊射</div>
+    <div>Lv5 → 三發齊射</div>
+    <div>Lv7 → 魚骨變大</div>
+    <div class="tip">撕咬範圍：80px內<br>撕咬冷卻：1.5秒</div>
+    <br>
+    <h3>📖 提示</h3>
+    <div class="tip">靠近老鼠按空白鍵<br>可觸發高傷害撕咬！<br>收集鼠肉升等強化<br>魚骨攻擊。</div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx    = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+let state, player, bullets, enemies, drops, particles, bloodSplats, stars;
+
+function initGame() {
+  state = { frame:0, score:0, paused:false, over:false,
+            shake:0, shakeX:0, shakeY:0,
+            spawnTimer:0, spawnInterval:90, berserk:0 };
+  player = {
+    x:W/2, y:H-90, w:46, h:38, speed:4.2,
+    hp:5, maxHp:5, cans:3,
+    exp:0, expNext:80, level:1,
+    invincible:0, boneSize:1, boneCount:1,
+    fireCooldown:0,
+    biteActive:false, biteTimer:0, biteCooldown:0,
+    tail:[]
+  };
+  bullets=[]; enemies=[]; drops=[]; particles=[]; bloodSplats=[];
+  stars = Array.from({length:80}, () => ({
+    x:Math.random()*W, y:Math.random()*H,
+    r:Math.random()*1.5+0.3,
+    speed:Math.random()*0.8+0.2,
+    bright:Math.random()
+  }));
+}
+
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.code]=true;
+  if(e.code==='Space'){e.preventDefault(); tryBite();}
+  if(e.code==='KeyZ') tryShoot();
+  if(e.code==='KeyP') state.paused=!state.paused;
+  if(e.code==='Enter' && state.over) initGame();
+});
+document.addEventListener('keyup', e => keys[e.code]=false);
+
+function rand(a,b){return Math.random()*(b-a)+a;}
+function randInt(a,b){return Math.floor(rand(a,b+1));}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
+
+function tryShoot(){
+  if(player.fireCooldown>0||state.over||state.paused) return;
+  const sz=player.boneSize, n=player.boneCount;
+  const offsets=n===1?[0]:n===2?[-13,13]:[-22,0,22];
+  const angles =n===1?[0]:n===2?[-0.09,0.09]:[-0.13,0,0.13];
+  offsets.forEach((ox,i)=>{
+    bullets.push({
+      x:player.x+ox, y:player.y-22,
+      vx:angles[i]*4, vy:-7.5,
+      w:Math.round(20*sz), h:Math.round(7*sz),
+      dmg:1+Math.floor((sz-1)*1.5)
+    });
+  });
+  player.fireCooldown=14-Math.min(6,player.level);
+}
+
+function tryBite(){
+  if(player.biteCooldown>0||state.over||state.paused) return;
+  let hitAny=false;
+  enemies.forEach(e=>{
+    if(!e.dead && dist(player,e)<80){ doHitEnemy(e,9999,true); hitAny=true; }
+  });
+  player.biteActive=true; player.biteTimer=20; player.biteCooldown=90;
+  if(!hitAny) spawnFloat(player.x,player.y-30,'空揮！','#ffaa00',14);
+}
+
+function doHitEnemy(e,dmg,isBite=false){
+  if(e.dead) return;
+  e.hp-=dmg;
+  spawnHitParts(e.x,e.y,isBite);
+  if(isBite){
+    spawnBlood(e.x,e.y);
+    state.shake=18;
+    const t=['撕碎！','咔嚓！','嘎吱！','爆裂！'];
+    spawnFloat(e.x,e.y-15,t[randInt(0,3)],'#ff1111',20);
+    state.score+=25*player.level;
+  }
+  if(e.hp<=0) killEnemy(e);
+}
+
+function killEnemy(e){
+  if(e.dead) return;
+  e.dead=true;
+  state.score+=10*player.level;
+  spawnDrops(e.x,e.y,e.type);
+  for(let i=0;i<12;i++){
+    const a=(i/12)*Math.PI*2, sp=rand(1.5,4);
+    particles.push({x:e.x,y:e.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,
+      life:30,maxLife:30,color:e.type==='bigMouse'?'#cc8844':'#aaa',size:rand(2,5),isText:false});
+  }
+}
+
+const ETYPES={
+  mouse:     {hp:2, speed:1.3, w:28,h:22,color:'#998877'},
+  bigMouse:  {hp:6, speed:0.65,w:44,h:36,color:'#776655'},
+  speedMouse:{hp:1, speed:2.8, w:22,h:18,color:'#bbaa99'}
+};
+
+function spawnDrops(x,y,type){
+  const r=Math.random();
+  let dt='meat';
+  if(type==='bigMouse') dt=r<0.5?'meat':r<0.75?'can':'milk';
+  else if(type==='speedMouse') dt=r<0.6?'meat':r<0.85?'milk':'can';
+  else dt=r<0.65?'meat':r<0.82?'can':'milk';
+  drops.push({x,y,vy:1.4,type:dt,life:280,bob:0});
+}
+
+function spawnHitParts(x,y,isBite){
+  const n=isBite?22:7;
+  for(let i=0;i<n;i++){
+    const a=rand(0,Math.PI*2),sp=rand(1,isBite?7:3.5);
+    particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,
+      life:randInt(16,38),maxLife:38,
+      color:isBite?`hsl(${randInt(0,25)},95%,${randInt(35,60)}%)`:'#ffee55',
+      size:rand(2,isBite?6:3),isText:false});
+  }
+}
+
+function spawnBlood(x,y){
+  for(let i=0;i<10;i++){
+    bloodSplats.push({
+      x:x+rand(-35,35),y:y+rand(-25,25),
+      r:rand(5,20),life:140,maxLife:140,
+      angle:rand(0,Math.PI*2),sx:rand(0.5,1.5)
+    });
+  }
+}
+
+function spawnFloat(x,y,text,color,size=16){
+  particles.push({x,y,vx:rand(-0.5,0.5),vy:-1.8,
+    life:55,maxLife:55,isText:true,text,color,size});
+}
+
+function spawnLevelUp(){
+  for(let i=0;i<40;i++){
+    const a=(i/40)*Math.PI*2,sp=rand(2,6);
+    particles.push({x:player.x,y:player.y,
+      vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,
+      life:50,maxLife:50,color:`hsl(${randInt(40,60)},100%,60%)`,
+      size:rand(3,7),isText:false});
+  }
+  spawnFloat(player.x,player.y-50,`LV.${player.level} 升級！`,'#ffdd00',22);
+}
+
+function spawnEnemy(){
+  let pool=['mouse'];
+  if(player.level>=2) pool.push('speedMouse');
+  if(player.level>=3) pool.push('bigMouse');
+  const type=pool[randInt(0,pool.length-1)];
+  const cfg=ETYPES[type];
+  enemies.push({
+    x:rand(cfg.w,W-cfg.w), y:-cfg.h,
+    ...cfg, type, dead:false,
+    moveAngle:rand(0,Math.PI*2), moveTimer:0, flashTimer:0
+  });
+}
+
+function update(){
+  if(state.paused||state.over) return;
+  state.frame++;
+  state.shake=Math.max(0,state.shake-1.5);
+  state.shakeX=state.shake>0?rand(-state.shake*0.6,state.shake*0.6):0;
+  state.shakeY=state.shake>0?rand(-state.shake*0.4,state.shake*0.4):0;
+  if(state.berserk>0) state.berserk--;
+
+  // 玩家移動
+  if(keys['ArrowLeft'] ||keys['KeyA']) player.x-=player.speed;
+  if(keys['ArrowRight']||keys['KeyD']) player.x+=player.speed;
+  if(keys['ArrowUp']   ||keys['KeyW']) player.y-=player.speed*0.8;
+  if(keys['ArrowDown'] ||keys['KeyS']) player.y+=player.speed*0.8;
+  player.x=clamp(player.x,player.w/2,W-player.w/2);
+  player.y=clamp(player.y,player.h/2,H-player.h/2);
+  player.tail.unshift({x:player.x,y:player.y});
+  if(player.tail.length>8) player.tail.pop();
+
+  if(keys['KeyZ']) tryShoot();
+  player.fireCooldown=Math.max(0,player.fireCooldown-1);
+  if(player.biteActive){
+    player.biteTimer--;
+    if(player.biteTimer<=0) player.biteActive=false;
+  }
+  player.biteCooldown=Math.max(0,player.biteCooldown-1);
+  if(player.invincible>0) player.invincible--;
+
+  // 子彈
+  bullets=bullets.filter(b=>b.y>-40&&b.x>-40&&b.x<W+40);
+  bullets.forEach(b=>{b.x+=b.vx;b.y+=b.vy;});
+
+  // 敵人生成
+  state.spawnTimer++;
+  const interval=Math.max(35,state.spawnInterval-player.level*3);
+  if(state.spawnTimer>=interval){
+    state.spawnTimer=0;
+    spawnEnemy();
+    if(player.level>=4&&Math.random()<0.3) spawnEnemy();
+  }
+
+  // 敵人移動
+  enemies.forEach(e=>{
+    if(e.dead) return;
+    e.moveTimer++;
+    if(e.moveTimer%80===0) e.moveAngle=rand(0,Math.PI*2);
+    const dx=player.x-e.x, dy=player.y-e.y, d=Math.hypot(dx,dy)||1;
+    e.x+=(dx/d)*e.speed*0.7+Math.cos(e.moveAngle)*e.speed*0.4;
+    e.y+=(dy/d)*e.speed*0.7+Math.sin(e.moveAngle)*e.speed*0.4;
+    e.x=clamp(e.x,e.w/2,W-e.w/2);
+    e.y=clamp(e.y,-e.h,H+60);
+    if(e.flashTimer>0) e.flashTimer--;
+  });
+
+  // 子彈 vs 敵人
+  bullets.forEach((b,bi)=>{
+    enemies.forEach(e=>{
+      if(e.dead) return;
+      if(Math.abs(b.x-e.x)<(b.w/2+e.w/2)&&Math.abs(b.y-e.y)<(b.h/2+e.h/2)){
+        doHitEnemy(e,b.dmg);
+        e.flashTimer=8;
+        bullets.splice(bi,1);
+      }
+    });
+  });
+
+  // 撕咬範圍（動畫期間）
+  if(player.biteActive&&state.frame%6===0){
+    enemies.forEach(e=>{if(!e.dead&&dist(player,e)<80) doHitEnemy(e,9999,true);});
+  }
+
+  // 敵人 vs 玩家
+  if(player.invincible===0&&state.berserk===0){
+    enemies.forEach(e=>{
+      if(e.dead) return;
+      if(dist(player,e)<(player.w/2+e.w/2-6)){
+        takeDamage(); e.dead=true; spawnHitParts(e.x,e.y,false);
+      }
+    });
+  }
+
+  // 掉落物
+  drops=drops.filter(d=>d.life>0&&d.y<H+50);
+  drops.forEach(d=>{
+    d.bob++;d.y+=d.vy;d.life--;
+    if(dist(player,d)<28){collectDrop(d);d.life=0;}
+  });
+
+  // 粒子
+  particles=particles.filter(p=>p.life>0);
+  particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vx*=0.93;p.vy*=0.93;p.life--;});
+
+  // 血跡
+  bloodSplats=bloodSplats.filter(b=>b.life>0);
+  bloodSplats.forEach(b=>b.life--);
+
+  // 清除死亡敵人
+  enemies=enemies.filter(e=>(!e.dead)&&e.y<H+80);
+
+  // 星星
+  stars.forEach(s=>{
+    s.y+=s.speed;
+    s.bright=0.4+0.6*Math.abs(Math.sin(state.frame*0.02+s.x));
+    if(s.y>H){s.y=0;s.x=Math.random()*W;}
+  });
+
+  // 升等
+  if(player.exp>=player.expNext){
+    player.exp-=player.expNext;
+    player.level++;
+    player.expNext=Math.floor(player.expNext*1.5);
+    player.maxHp=Math.min(10,player.maxHp+1);
+    player.hp=Math.min(player.maxHp,player.hp+1);
+    player.boneSize=1+(player.level-1)*0.25;
+    if(player.level>=5) player.boneCount=3;
+    else if(player.level>=3) player.boneCount=2;
+    spawnLevelUp();
+  }
+}
+
+function takeDamage(){
+  if(player.cans>0){
+    player.cans--;
+    player.invincible=90;
+    state.shake=10;
+    spawnFloat(player.x,player.y-40,'罐頭保護！','#ffaa44',15);
+  } else {
+    player.hp--;
+    player.invincible=80;
+    state.shake=20;
+    if(player.hp<=0){state.over=true;}
+  }
+}
+
+function collectDrop(d){
+  if(d.type==='meat'){
+    const g=15+player.level*5;
+    player.exp+=g;
+    spawnFloat(d.x,d.y-15,`+${g} EXP`,'#ff9944',13);
+    state.score+=5;
+  } else if(d.type==='milk'){
+    state.berserk=300; player.invincible=300; state.shake=8;
+    spawnFloat(d.x,d.y-15,'無敵狂暴！🥛','#44aaff',16);
+    enemies.forEach(e=>{if(!e.dead) doHitEnemy(e,9999,true);});
+  } else {
+    if(player.cans<5){player.cans++;spawnFloat(d.x,d.y-15,'+1 罐頭🥫','#ff8844',14);}
+    else{player.hp=Math.min(player.maxHp,player.hp+2);spawnFloat(d.x,d.y-15,'+2 HP','#44ff88',14);}
+  }
+}
+
+// ─── 繪製 ───────────────────────────────────────────
+function draw(){
+  ctx.save();
+  ctx.translate(state.shakeX,state.shakeY);
+
+  ctx.fillStyle='#080810';
+  ctx.fillRect(-10,-10,W+20,H+20);
+
+  // 星星
+  stars.forEach(s=>{
+    ctx.globalAlpha=s.bright*0.7;
+    ctx.fillStyle='#ffffff';
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // 血跡
+  bloodSplats.forEach(b=>{
+    ctx.save();
+    ctx.globalAlpha=(b.life/b.maxLife)*0.75;
+    ctx.translate(b.x,b.y); ctx.rotate(b.angle); ctx.scale(b.sx,1);
+    ctx.beginPath(); ctx.arc(0,0,b.r,0,Math.PI*2);
+    ctx.fillStyle='#880000'; ctx.fill();
+    ctx.restore();
+  });
+
+  // 掉落物
+  drops.forEach(d=>{
+    const bob=Math.sin(d.bob*0.12)*3;
+    ctx.save();
+    ctx.globalAlpha=Math.min(1,d.life/40);
+    ctx.translate(d.x,d.y+bob);
+    ctx.font='18px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(d.type==='meat'?'🥩':d.type==='milk'?'🥛':'🥫',0,0);
+    ctx.restore();
+  });
+
+  // 敵人
+  enemies.forEach(e=>{
+    if(e.dead) return;
+    ctx.save(); ctx.translate(e.x,e.y);
+    ctx.globalAlpha=(e.flashTimer>0&&e.flashTimer%3<2)?0.3:1;
+    drawMouse(e.w,e.h,e.type,e.color);
+    if(e.hp<ETYPES[e.type].hp){
+      const mhp=ETYPES[e.type].hp, bw=e.w+6;
+      ctx.fillStyle='#441111'; ctx.fillRect(-bw/2,-e.h/2-10,bw,5);
+      ctx.fillStyle='#ff4444'; ctx.fillRect(-bw/2,-e.h/2-10,bw*(e.hp/mhp),5);
+    }
+    ctx.restore();
+  });
+
+  // 子彈魚骨
+  bullets.forEach(b=>drawBone(b));
+
+  // 尾跡
+  player.tail.forEach((t,i)=>{
+    ctx.globalAlpha=(1-i/player.tail.length)*0.15;
+    ctx.fillStyle=state.berserk>0?'#4488ff':'#ff8844';
+    ctx.beginPath(); ctx.ellipse(t.x,t.y,player.w*0.4,player.h*0.3,0,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // 玩家
+  const blink=player.invincible>0&&Math.floor(state.frame/5)%2===0;
+  if(!blink){
+    ctx.save(); ctx.translate(player.x,player.y);
+    drawCat(player.w,player.h,state.berserk>0,player.biteActive);
+    ctx.restore();
+  }
+
+  // 撕咬圓形指示
+  if(player.biteCooldown>75&&player.biteCooldown<90){
+    ctx.save();
+    ctx.globalAlpha=(player.biteCooldown-75)/15*0.3;
+    ctx.strokeStyle='#ff2222'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(player.x,player.y,80,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+
+  // 粒子
+  particles.forEach(p=>{
+    ctx.globalAlpha=p.life/p.maxLife;
+    if(p.isText){
+      ctx.font=`bold ${p.size}px 'Microsoft JhengHei'`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.strokeStyle='rgba(0,0,0,0.6)'; ctx.lineWidth=3;
+      ctx.strokeText(p.text,p.x,p.y);
+      ctx.fillStyle=p.color; ctx.fillText(p.text,p.x,p.y);
+    } else {
+      ctx.fillStyle=p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.size*(p.life/p.maxLife),0,Math.PI*2); ctx.fill();
+    }
+  });
+  ctx.globalAlpha=1;
+  ctx.restore();
+
+  drawHUD();
+  if(state.paused) drawOverlay('暫停中','按 P 繼續','#ffcc00');
+  if(state.over)   drawOverlay('GAME OVER',`得分：${state.score}　按 Enter 重試`,'#ff3333');
+}
+
+function drawCat(w,h,berserk,biting){
+  const col=berserk?'#5599ff':'#e8c87a';
+  const dark=berserk?'#3377dd':'#c4a055';
+
+  ctx.fillStyle=col;
+  ctx.beginPath(); ctx.ellipse(0,0,w/2,h/2,0,0,Math.PI*2); ctx.fill();
+
+  // 耳朵
+  [[-w*0.35,-h*0.45],[w*0.35,-h*0.45]].forEach(([ex,ey])=>{
+    ctx.fillStyle=col;
+    ctx.beginPath(); ctx.moveTo(ex,ey); ctx.lineTo(ex-8,ey-18); ctx.lineTo(ex+8,ey-18); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#ffaaaa';
+    ctx.beginPath(); ctx.moveTo(ex,ey-2); ctx.lineTo(ex-4,ey-13); ctx.lineTo(ex+4,ey-13); ctx.closePath(); ctx.fill();
+  });
+
+  // 眼睛
+  if(berserk){
+    ctx.fillStyle='#ff2222';
+    [-8,8].forEach(ox=>{ctx.beginPath();ctx.ellipse(ox,-5,5,6,0,0,Math.PI*2);ctx.fill();});
+  } else if(biting){
+    ctx.fillStyle='#333';
+    [-8,8].forEach(ox=>{ctx.fillRect(ox-5,-7,10,4);});
+  } else {
+    ctx.fillStyle='#333';
+    [-8,8].forEach(ox=>{ctx.beginPath();ctx.ellipse(ox,-5,4,5,0,0,Math.PI*2);ctx.fill();});
+    ctx.fillStyle='#fff';
+    [-8,8].forEach(ox=>{ctx.beginPath();ctx.arc(ox+1,-6,1.5,0,Math.PI*2);ctx.fill();});
+  }
+
+  // 鼻子
+  ctx.fillStyle='#ff8888'; ctx.beginPath(); ctx.arc(0,1,2.5,0,Math.PI*2); ctx.fill();
+
+  // 嘴巴
+  ctx.strokeStyle='#994444'; ctx.lineWidth=1.5;
+  if(biting){
+    ctx.beginPath(); ctx.arc(0,3,8,0,Math.PI); ctx.stroke();
+    ctx.fillStyle='#ffffff';
+    [-4,0,4].forEach(ox=>{ctx.fillRect(ox-2,3,4,5);});
+  } else {
+    ctx.beginPath(); ctx.arc(0,2,5,0.1,Math.PI-0.1); ctx.stroke();
+  }
+
+  // 鬍鬚
+  ctx.strokeStyle=dark; ctx.lineWidth=1;
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy],i)=>{
+    const side=i<2?-1:1;
+    ctx.beginPath(); ctx.moveTo(side*8,2); ctx.lineTo(side*26,2+sy*4); ctx.stroke();
+  });
+
+  // 尾巴
+  ctx.strokeStyle=dark; ctx.lineWidth=5; ctx.lineCap='round';
+  const t=state.frame*0.05;
+  ctx.beginPath();
+  ctx.moveTo(w*0.4,h*0.2);
+  ctx.bezierCurveTo(w*0.8,h*0.5,w*0.9+Math.cos(t)*12,Math.sin(t)*15,w*0.7+Math.cos(t)*18,-h*0.3+Math.sin(t)*10);
+  ctx.stroke();
+}
+
+function drawBone(b){
+  const bs=state.berserk>0;
+  ctx.save();
+  ctx.translate(b.x,b.y);
+  ctx.rotate(Math.atan2(b.vy,b.vx));
+  const bw=b.w,bh=b.h;
+  ctx.strokeStyle=bs?'#2266aa':'#c8b870';
+  ctx.lineWidth=Math.max(1.5,bh*0.35); ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(-bw/2,0); ctx.lineTo(bw/2,0); ctx.stroke();
+  ctx.strokeStyle=bs?'#44aaff':'#f0e8c0';
+  ctx.lineWidth=Math.max(1,bh*0.25);
+  const nr=Math.round(3+bw*0.1);
+  for(let i=0;i<nr;i++){
+    const px=-bw/2+(bw/(nr+1))*(i+1),hl=bh*0.7;
+    ctx.beginPath(); ctx.moveTo(px,-hl); ctx.lineTo(px,hl); ctx.stroke();
+  }
+  ctx.fillStyle=bs?'#44aaff':'#f0e8c0';
+  [-bw/2,bw/2].forEach(ex=>{ctx.beginPath();ctx.arc(ex,0,bh*0.55,0,Math.PI*2);ctx.fill();});
+  ctx.restore();
+}
+
+function drawMouse(w,h,type,color){
+  ctx.fillStyle=color;
+  ctx.beginPath(); ctx.ellipse(0,0,w/2,h/2,0,0,Math.PI*2); ctx.fill();
+  [[-w*0.3,-h*0.45],[w*0.3,-h*0.45]].forEach(([ex,ey])=>{
+    ctx.fillStyle=color;
+    ctx.beginPath(); ctx.ellipse(ex,ey,w*0.2,h*0.28,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ffbbbb';
+    ctx.beginPath(); ctx.ellipse(ex,ey,w*0.12,h*0.18,0,0,Math.PI*2); ctx.fill();
+  });
+  ctx.fillStyle='#ff2222';
+  [-w*0.18,w*0.18].forEach(ox=>{ctx.beginPath();ctx.arc(ox,-h*0.05,w*0.1,0,Math.PI*2);ctx.fill();});
+  ctx.fillStyle='#ff9999'; ctx.beginPath(); ctx.arc(0,h*0.1,w*0.07,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#776655'; ctx.lineWidth=2; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(w/2,h*0.1); ctx.quadraticCurveTo(w*0.9,h*0.5,w*0.6,h*0.9); ctx.stroke();
+  if(type==='bigMouse'){ctx.font=`bold ${Math.round(w*0.35)}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('👑',0,-h*0.7);}
+  if(type==='speedMouse'){ctx.font=`${Math.round(w*0.35)}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#fff';ctx.fillText('⚡',w*0.55,0);}
+}
+
+function drawHUD(){
+  ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,0,W,56);
+
+  ctx.fillStyle='#ffdddd'; ctx.font='bold 13px Microsoft JhengHei';
+  ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillText('HP',10,8);
+  for(let i=0;i<player.maxHp;i++){
+    ctx.fillStyle=i<player.hp?'#ff4444':'#441111';
+    ctx.beginPath(); ctx.arc(42+i*18,14,7,0,Math.PI*2); ctx.fill();
+  }
+
+  ctx.font='13px serif'; ctx.fillText('🥫',10,30);
+  for(let i=0;i<5;i++){
+    ctx.fillStyle=i<player.cans?'#ff8844':'#442211';
+    ctx.fillRect(32+i*16,31,12,10);
+    ctx.strokeStyle='#000'; ctx.lineWidth=0.5; ctx.strokeRect(32+i*16,31,12,10);
+  }
+
+  ctx.fillStyle='#ffdd44'; ctx.font='bold 14px Microsoft JhengHei';
+  ctx.textAlign='right'; ctx.textBaseline='top'; ctx.fillText(`LV.${player.level}`,W-10,8);
+  ctx.fillStyle='#ffffff'; ctx.font='13px Microsoft JhengHei';
+  ctx.fillText(`${state.score} pts`,W-10,28);
+
+  ctx.fillStyle='#222'; ctx.fillRect(0,50,W,6);
+  const ep=player.exp/player.expNext;
+  const eg=ctx.createLinearGradient(0,0,W*ep,0);
+  eg.addColorStop(0,'#ff6b35'); eg.addColorStop(1,'#ffaa00');
+  ctx.fillStyle=eg; ctx.fillRect(0,50,W*ep,6);
+  ctx.fillStyle='rgba(255,255,255,0.15)'; ctx.font='9px sans-serif';
+  ctx.textAlign='center'; ctx.fillText(`EXP ${player.exp}/${player.expNext}`,W/2,57);
+
+  if(state.berserk>0){
+    const a=0.3+0.3*Math.abs(Math.sin(state.frame*0.2));
+    ctx.fillStyle=`rgba(50,100,255,${a})`; ctx.fillRect(0,56,W,H-56);
+    ctx.fillStyle='#aaddff'; ctx.font='bold 14px Microsoft JhengHei';
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillText(`🥛 無敵狂暴！剩餘 ${Math.ceil(state.berserk/60)} 秒`,W/2,78);
+  }
+
+  if(player.biteCooldown>0){
+    const pct=1-player.biteCooldown/90;
+    ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(10,H-26,100,12);
+    ctx.fillStyle=pct<0.5?'#ff4444':'#44ff88'; ctx.fillRect(10,H-26,100*pct,12);
+    ctx.fillStyle='#fff'; ctx.font='10px Microsoft JhengHei'; ctx.textAlign='left';
+    ctx.textBaseline='middle'; ctx.fillText('撕咬冷卻',14,H-20);
+  } else {
+    ctx.fillStyle='#44ff88'; ctx.font='bold 11px Microsoft JhengHei';
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText('⚡ 撕咬就緒！(Space)',10,H-18);
+  }
+}
+
+function drawOverlay(title,sub,color){
+  ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.fillRect(0,0,W,H);
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle=color; ctx.font='bold 34px Microsoft JhengHei';
+  ctx.fillText(title,W/2,H/2-18);
+  ctx.fillStyle='#cccccc'; ctx.font='15px Microsoft JhengHei';
+  ctx.fillText(sub,W/2,H/2+20);
+}
+
+function loop(){update();draw();requestAnimationFrame(loop);}
+initGame();
+loop();
+</script>
+</body>
+</html>
