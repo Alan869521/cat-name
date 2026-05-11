@@ -73,6 +73,18 @@ catImg.src = 'assets/black.png';
 
 let state, player, bullets, enemies, drops, particles, bloodSplats, stars;
 
+// 當圖片載入完成後，根據比例放大角色
+catImg.onload = function() {
+  const targetHeight = 100; // 👉 在這裡調整你想放大的高度 (原本大約只有 38)
+  const ratio = this.naturalWidth / this.naturalHeight;
+  
+  // 更新 player 的初始寬高
+  player.h = targetHeight;
+  player.w = targetHeight * ratio;
+  
+  console.log("圖片載入成功，比例已調整");
+};
+
 // 👉 新增：專業圖片比例預載入器
 catImg.onload = function() {
   const targetWidth = 46; // 我們設定角色寬度不變
@@ -380,29 +392,26 @@ function collectDrop(d){
 
 function drawCat(w, h, berserk, biting) {
     ctx.save();
-    // 👉 新增：專業級畫質平滑化 (抗鋸齒)
-    ctx.imageSmoothingEnabled = true; // 開啟圖片平滑化
-    ctx.imageSmoothingQuality = 'high'; // 設定最高平滑畫質
+    
+    // 👉 關鍵：開啟抗鋸齒與高品質縮放
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
     if (berserk) {
         ctx.shadowBlur = 15;
         ctx.shadowColor = "#4488ff";
         ctx.filter = "brightness(1.2) sepia(0.5) hue-rotate(180deg)";
     }
     
-    // 優先使用圖片
     if (catImg.complete && catImg.naturalWidth !== 0) {
+        // 畫出你的貓
         ctx.drawImage(catImg, -w/2, -h/2, w, h);
     } else {
-        // 如果圖片讀不到，畫一個原本的黃色圓形
+        // 備用黃色圓形
         ctx.fillStyle = berserk ? '#5599ff' : '#e8c87a';
         ctx.beginPath(); 
         ctx.ellipse(0, 0, w/2, h/2, 0, 0, Math.PI*2); 
         ctx.fill();
-        // 畫耳朵
-        ctx.fillStyle = berserk ? '#5599ff' : '#e8c87a';
-        [[-w*0.3,-h*0.4],[w*0.3,-h*0.4]].forEach(([ex,ey])=>{
-            ctx.beginPath(); ctx.moveTo(ex,ey); ctx.lineTo(ex-5,ey-10); ctx.lineTo(ex+5,ey-10); ctx.closePath(); ctx.fill();
-        });
     }
     ctx.restore();
 }
