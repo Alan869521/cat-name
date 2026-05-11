@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<title>喵不可言：魚骨行動</title>
+<title>喵不可言：魚骨行動 - 黃金視窗版</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body {
@@ -11,29 +11,30 @@ body {
   align-items:center; justify-content:center;
   min-height:100vh;
   font-family:'Microsoft JhengHei', sans-serif;
-  overflow:hidden; user-select:none;
+  overflow:hidden; /* 避免捲軸出現 */
+  user-select:none;
 }
-#title { color:#ff6b35; font-size:24px; font-weight:bold; margin-bottom:6px;
-  text-shadow:0 0 20px rgba(255,107,53,0.7); letter-spacing:3px; }
-#subtitle { color:#777; font-size:12px; margin-bottom:10px; letter-spacing:2px; }
+#title { color:#ff6b35; font-size:24px; font-weight:bold; margin-bottom:5px;
+  text-shadow:0 0 15px rgba(255,107,53,0.7); letter-spacing:3px; }
+#subtitle { color:#777; font-size:12px; margin-bottom:12px; letter-spacing:2px; }
 
-/* 確保遊戲包裝層是橫向排列 */
 #gameWrapper { 
   display: flex; 
   flex-direction: row; 
-  gap: 20px; 
+  gap: 15px; 
   align-items: flex-start; 
 }
 
+/* 畫布設定為 900x600 */
 canvas { 
   display: block; 
   border: 2px solid #ff6b35; 
-  border-radius: 8px; 
+  border-radius: 10px; 
   box-shadow: 0 0 30px rgba(255,107,53,0.4); 
 }
 
 #panel {
-  color:#ddd; width:160px; font-size:12px; line-height:1.7;
+  color:#ddd; width:160px; font-size:12px; line-height:1.6;
   background:rgba(255,255,255,0.04);
   border:1px solid rgba(255,107,53,0.25); border-radius:8px; padding:15px;
 }
@@ -41,7 +42,7 @@ canvas {
   border-bottom:1px solid rgba(255,107,53,0.25); padding-bottom:5px; }
 .key { display:inline-block; background:rgba(255,107,53,0.15);
   border:1px solid #ff6b35; border-radius:3px; padding:0 5px;
-  font-size:10px; color:#ff6b35; }
+  font-size:10px; color:#ff6b35; font-weight:bold;}
 #panel .tip { color:#888; font-size:11px; margin-top:4px; }
 </style>
 </head>
@@ -49,7 +50,7 @@ canvas {
 <div id="title">喵不可言：魚骨行動</div>
 <div id="subtitle">MEOW UNSPEAKABLE · FISHBONE OPERATION</div>
 <div id="gameWrapper">
-  <canvas id="game" width="800" height="500"></canvas>
+  <canvas id="game" width="900" height="600"></canvas>
   <div id="panel">
     <h3>🎮 操作</h3>
     <div><span class="key">←→↑↓</span> 移動</div>
@@ -59,21 +60,21 @@ canvas {
     <div><span class="key">Enter</span> 重新開始</div>
     <br>
     <h3>🎯 道具</h3>
-    <div>🥩 鼠肉 → 經驗值</div>
-    <div>🥛 牛奶 → 無敵狂暴</div>
-    <div>罐頭 → 生命保護</div>
+    <div>🥩 鼠肉 → 經驗</div>
+    <div>🥛 牛奶 → 狂暴</div>
+    <div>🥫 罐頭 → 保護</div>
     <br>
     <h3>⚔️ 成長</h3>
-    <div>Lv3 → 雙發齊射</div>
-    <div>Lv5 → 三發齊射</div>
-    <div class="tip">收集鼠肉升等強化。</div>
+    <div>Lv3 → 雙發</div>
+    <div>Lv5 → 三發</div>
+    <div class="tip">收集鼠肉強化魚骨。</div>
   </div>
 </div>
 
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-const W = canvas.width, H = canvas.height;
+const W = canvas.width, H = canvas.height; 
 
 // --- 圖片預載入 ---
 const catImg = new Image();
@@ -81,21 +82,21 @@ catImg.src = 'assets/black.png';
 
 let state, player, bullets, enemies, drops, particles, bloodSplats, stars;
 
-// 單一且完整的圖片載入處理
 catImg.onload = function() {
-  const targetHeight = 85; // 貓咪的高度，可以改這個數字來調整大小
+  const targetHeight = 90; // 在 900x600 畫面中，貓咪設為 90px 比例最美
   const ratio = this.naturalWidth / this.naturalHeight;
   player.h = targetHeight;
   player.w = targetHeight * ratio;
-  console.log("新貓咪圖案載入成功，寬高比已自動校正");
 };
 
 function initGame() {
   state = { frame:0, score:0, paused:false, over:false,
             shake:0, shakeX:0, shakeY:0,
-            spawnTimer:0, spawnInterval:80, berserk:0 };
+            spawnTimer:0, spawnInterval:75,
+            berserk:0 };
   player = {
-    x: 100, y: H/2, w: 46, h: 38, speed: 5.0, // 橫向遊戲速度稍微調快一點
+    x: W/2, y: H-100, w: 46, h: 38,
+    speed: 5.8, 
     hp:5, maxHp:5, cans:3,
     exp:0, expNext:80, level:1,
     invincible:0, boneSize:1, boneCount:1,
@@ -104,10 +105,10 @@ function initGame() {
     tail:[]
   };
   bullets=[]; enemies=[]; drops=[]; particles=[]; bloodSplats=[];
-  stars = Array.from({length:100}, () => ({
+  stars = Array.from({length:120}, () => ({
     x:Math.random()*W, y:Math.random()*H,
-    r:Math.random()*1.5+0.3,
-    speed:Math.random()*0.8+0.2,
+    r:Math.random()*1.5+0.4,
+    speed:Math.random()*0.9+0.3,
     bright:Math.random()
   }));
 }
@@ -122,21 +123,21 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => keys[e.code]=false);
 
-function rand(a,b){return Math.random()*(b-a)+a;}
-function randInt(a,b){return Math.floor(rand(a,b+1));}
-function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
-function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
+const rand = (a,b) => Math.random()*(b-a)+a;
+const randInt = (a,b) => Math.floor(rand(a,b+1));
+const dist = (a,b) => Math.hypot(a.x-b.x,a.y-b.y);
+const clamp = (v,lo,hi) => Math.max(lo,Math.min(hi,v));
 
 function tryShoot(){
   if(player.fireCooldown>0||state.over||state.paused) return;
   const sz=player.boneSize, n=player.boneCount;
-  const offsets=n===1?[0]:n===2?[-13,13]:[-22,0,22];
+  const offsets=n===1?[0]:n===2?[-14,14]:[-24,0,24];
   const angles =n===1?[0]:n===2?[-0.09,0.09]:[-0.13,0,0.13];
   offsets.forEach((ox,i)=>{
     bullets.push({
-      x:player.x + player.w/2, y:player.y,
-      vx:angles[i]*4 + 7, vy:angles[i]*4, // 橫向發射
-      w:Math.round(20*sz), h:Math.round(7*sz),
+      x:player.x+ox, y:player.y-25,
+      vx:angles[i]*4.5, vy:-8, 
+      w:Math.round(21*sz), h:Math.round(8*sz),
       dmg:1+Math.floor((sz-1)*1.5)
     });
   });
@@ -147,10 +148,10 @@ function tryBite(){
   if(player.biteCooldown>0||state.over||state.paused) return;
   let hitAny=false;
   enemies.forEach(e=>{
-    if(!e.dead && dist(player,e)<100){ doHitEnemy(e,9999,true); hitAny=true; }
+    if(!e.dead && dist(player,e)<110){ doHitEnemy(e,9999,true); hitAny=true; }
   });
   player.biteActive=true; player.biteTimer=20; player.biteCooldown=90;
-  if(!hitAny) spawnFloat(player.x,player.y-30,'空揮！','#ffaa00',14);
+  if(!hitAny) spawnFloat(player.x,player.y-35,'空揮！','#ffaa00',15);
 }
 
 function doHitEnemy(e,dmg,isBite=false){
@@ -160,8 +161,6 @@ function doHitEnemy(e,dmg,isBite=false){
   if(isBite){
     spawnBlood(e.x,e.y);
     state.shake=18;
-    const t=['撕碎！','咔嚓！','嘎吱！','爆裂！'];
-    spawnFloat(e.x,e.y-15,t[randInt(0,3)],'#ff1111',20);
     state.score+=25*player.level;
   }
   if(e.hp<=0) killEnemy(e);
@@ -173,15 +172,15 @@ function killEnemy(e){
   state.score+=10*player.level;
   spawnDrops(e.x,e.y,e.type);
   for(let i=0;i<12;i++){
-    const a=(i/12)*Math.PI*2, sp=rand(1.5,4);
+    const a=(i/12)*Math.PI*2, sp=rand(1.6,4.2);
     particles.push({x:e.x,y:e.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,
       life:30,maxLife:30,color:e.type==='bigMouse'?'#cc8844':'#aaa',size:rand(2,5),isText:false});
   }
 }
 
 const ETYPES={
-  mouse:      {hp:2, speed:1.5, w:28,h:22,color:'#998877'},
-  bigMouse:   {hp:6, speed:0.8, w:44,h:36,color:'#776655'},
+  mouse:      {hp:2, speed:1.4, w:28,h:22,color:'#998877'},
+  bigMouse:   {hp:6, speed:0.7, w:45,h:38,color:'#776655'},
   speedMouse: {hp:1, speed:3.2, w:22,h:18,color:'#bbaa99'}
 };
 
@@ -191,24 +190,24 @@ function spawnDrops(x,y,type){
   if(type==='bigMouse') dt=r<0.5?'meat':r<0.75?'can':'milk';
   else if(type==='speedMouse') dt=r<0.6?'meat':r<0.85?'milk':'can';
   else dt=r<0.65?'meat':r<0.82?'can':'milk';
-  drops.push({x,y,vy:0, vx:-1.5, type:dt,life:280,bob:0});
+  drops.push({x,y,vy:1.5, vx:0, type:dt,life:280,bob:0});
 }
 
 function spawnHitParts(x,y,isBite){
   const n=isBite?22:7;
   for(let i=0;i<n;i++){
-    const a=rand(0,Math.PI*2),sp=rand(1,isBite?7:3.5);
+    const a=rand(0,Math.PI*2),sp=rand(1,isBite?7.5:3.8);
     particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,
       life:randInt(16,38),maxLife:38,
       color:isBite?`hsl(${randInt(0,25)},95%,${randInt(35,60)}%)`:'#ffee55',
-      size:rand(2,isBite?6:3),isText:false});
+      size:rand(2,isBite?6:3.5),isText:false});
   }
 }
 
 function spawnBlood(x,y){
   for(let i=0;i<10;i++){
     bloodSplats.push({
-      x:x+rand(-35,35),y:y+rand(-25,25),
+      x:x+rand(-38,38),y:y+rand(-28,28),
       r:rand(5,20),life:140,maxLife:140,
       angle:rand(0,Math.PI*2),sx:rand(0.5,1.5)
     });
@@ -228,7 +227,7 @@ function spawnLevelUp(){
       life:50,maxLife:50,color:`hsl(${randInt(40,60)},100%,60%)`,
       size:rand(3,7),isText:false});
   }
-  spawnFloat(player.x,player.y-50,`LV.${player.level} 升級！`,'#ffdd00',22);
+  spawnFloat(player.x,player.y-55,`LV.${player.level} 升級！`,'#ffdd00',22);
 }
 
 function spawnEnemy(){
@@ -237,9 +236,8 @@ function spawnEnemy(){
   if(player.level>=3) pool.push('bigMouse');
   const type=pool[randInt(0,pool.length-1)];
   const cfg=ETYPES[type];
-  // 敵人改從右邊出現
   enemies.push({
-    x:W + cfg.w, y:rand(cfg.h, H-cfg.h),
+    x:rand(cfg.w, W-cfg.w), y:-cfg.h,
     ...cfg, type, dead:false,
     moveAngle:rand(0,Math.PI*2), moveTimer:0, flashTimer:0
   });
@@ -249,8 +247,8 @@ function update(){
   if(state.paused||state.over) return;
   state.frame++;
   state.shake=Math.max(0,state.shake-1.5);
-  state.shakeX=state.shake>0?rand(-state.shake*0.6,state.shake*0.6):0;
-  state.shakeY=state.shake>0?rand(-state.shake*0.4,state.shake*0.4):0;
+  state.shakeX=state.shake>0?rand(-state.shake*0.65,state.shake*0.65):0;
+  state.shakeY=state.shake>0?rand(-state.shake*0.45,state.shake*0.45):0;
   if(state.berserk>0) state.berserk--;
 
   if(keys['ArrowLeft'] ||keys['KeyA']) player.x-=player.speed;
@@ -271,9 +269,8 @@ function update(){
   player.biteCooldown=Math.max(0,player.biteCooldown-1);
   if(player.invincible>0) player.invincible--;
 
-  // 子彈改為向右飛
   bullets.forEach(b=>{b.x+=b.vx; b.y+=b.vy;});
-  bullets=bullets.filter(b=>b.x < W+50);
+  bullets=bullets.filter(b=>b.y > -50);
 
   state.spawnTimer++;
   const interval=Math.max(30,state.spawnInterval-player.level*4);
@@ -285,8 +282,8 @@ function update(){
   enemies.forEach(e=>{
     if(e.dead) return;
     const dx=player.x-e.x, dy=player.y-e.y, d=Math.hypot(dx,dy)||1;
-    e.x+=(dx/d)*e.speed;
-    e.y+=(dy/d)*e.speed;
+    e.x+=(dx/d)*e.speed*0.75; 
+    e.y+=(dy/d)*e.speed*0.75 + 0.55; 
     if(e.flashTimer>0) e.flashTimer--;
   });
 
@@ -304,27 +301,27 @@ function update(){
   if(player.invincible===0&&state.berserk===0){
     enemies.forEach(e=>{
       if(e.dead) return;
-      if(dist(player,e)<(player.w/2+e.w/2-5)){
+      if(dist(player,e)<(player.w/2+e.w/2-6)){
         takeDamage(); e.dead=true;
       }
     });
   }
 
   drops.forEach(d=>{
-    d.bob++; d.x+=d.vx; d.life--;
-    if(dist(player,d)<35){collectDrop(d);d.life=0;}
+    d.bob++; d.y+=d.vy; d.life--;
+    if(dist(player,d)<38){collectDrop(d);d.life=0;}
   });
-  drops=drops.filter(d=>d.life>0 && d.x > -50);
+  drops=drops.filter(d=>d.life>0 && d.y < H+50);
 
   particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vx*=0.93;p.vy*=0.93;p.life--;});
   particles=particles.filter(p=>p.life>0);
   bloodSplats.forEach(b=>b.life--);
   bloodSplats=bloodSplats.filter(b=>b.life>0);
-  enemies=enemies.filter(e=>(!e.dead)&&e.x > -100);
+  enemies=enemies.filter(e=>(!e.dead)&&e.y < H+100);
 
   stars.forEach(s=>{
-    s.x-=s.speed; // 星星向左流動
-    if(s.x < 0){s.x=W; s.y=Math.random()*H;}
+    s.y+=s.speed; 
+    if(s.y > H){s.y=0; s.x=Math.random()*W;}
   });
 
   if(player.exp>=player.expNext){
@@ -340,7 +337,7 @@ function takeDamage(){
   if(player.cans>0){
     player.cans--;
     player.invincible=90;
-    spawnFloat(player.x,player.y-40,'罐頭保護！','#ffaa44',15);
+    spawnFloat(player.x,player.y-45,'罐頭保護！','#ffaa44',16);
   } else {
     player.hp--;
     player.invincible=80;
@@ -352,13 +349,13 @@ function takeDamage(){
 function collectDrop(d){
   if(d.type==='meat'){
     player.exp+=20;
-    spawnFloat(d.x,d.y-15,'+20 EXP','#ff9944',13);
+    spawnFloat(d.x,d.y-18,'+20 EXP','#ff9944',13);
   } else if(d.type==='milk'){
     state.berserk=300; player.invincible=300;
-    spawnFloat(d.x,d.y-15,'無敵狂暴！','#44aaff',16);
+    spawnFloat(d.x,d.y-18,'無敵狂暴！','#44aaff',17);
   } else {
     player.cans=Math.min(5, player.cans+1);
-    spawnFloat(d.x,d.y-15,'+1 罐頭','#ff8844',14);
+    spawnFloat(d.x,d.y-18,'+1 罐頭','#ff8844',15);
   }
 }
 
@@ -368,9 +365,9 @@ function drawCat(w, h, berserk) {
     ctx.imageSmoothingQuality = 'high';
 
     if (berserk) {
-        ctx.shadowBlur = 15;
+        ctx.shadowBlur = 18;
         ctx.shadowColor = "#4488ff";
-        ctx.filter = "brightness(1.2) hue-rotate(180deg)";
+        ctx.filter = "brightness(1.1) hue-rotate(180deg)";
     }
     
     if (catImg.complete && catImg.naturalWidth !== 0) {
@@ -402,7 +399,7 @@ function draw(){
   });
 
   drops.forEach(d=>{
-    ctx.font='20px serif'; ctx.textAlign='center';
+    ctx.font='22px serif'; ctx.textAlign='center';
     ctx.fillText(d.type==='meat'?'🥩':d.type==='milk'?'🥛':'🥫',d.x,d.y+Math.sin(d.bob*0.1)*5);
   });
 
@@ -445,20 +442,19 @@ function draw(){
 }
 
 function drawHUD(){
-  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,40);
-  ctx.fillStyle='#fff'; ctx.font='14px sans-serif';
-  ctx.textAlign='left'; ctx.fillText(`HP: ${player.hp}  LV: ${player.level}  Score: ${state.score}`, 20, 25);
-  // 經驗值條
-  ctx.fillStyle='#333'; ctx.fillRect(0,H-5,W,5);
-  ctx.fillStyle='#ffaa00'; ctx.fillRect(0,H-5,W*(player.exp/player.expNext),5);
+  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,45);
+  ctx.fillStyle='#fff'; ctx.font='bold 15px sans-serif';
+  ctx.textAlign='left'; ctx.fillText(`HP: ${player.hp}  LV: ${player.level}  Score: ${state.score}  🥫: ${player.cans}`, 20, 28);
+  ctx.fillStyle='#333'; ctx.fillRect(0,H-6,W,6);
+  ctx.fillStyle='#ffaa00'; ctx.fillRect(0,H-6,W*(player.exp/player.expNext),6);
 }
 
 function drawOverlay(title,sub,color){
   ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(0,0,W,H);
-  ctx.textAlign='center'; ctx.fillStyle=color; ctx.font='bold 40px sans-serif';
-  ctx.fillText(title,W/2,H/2-20);
+  ctx.textAlign='center'; ctx.fillStyle=color; ctx.font='bold 45px sans-serif';
+  ctx.fillText(title,W/2,H/2-25);
   ctx.fillStyle='#fff'; ctx.font='18px sans-serif';
-  ctx.fillText(sub,W/2,H/2+30);
+  ctx.fillText(sub,W/2,H/2+35);
 }
 
 function loop(){update();draw();requestAnimationFrame(loop);}
