@@ -437,8 +437,12 @@ function draw(){
   const blink=player.invincible>0&&Math.floor(state.frame/5)%2===0;
   if(!blink){
     ctx.save(); ctx.translate(player.x,player.y);
-    drawCat(player.w,player.h,state.berserk>0,player.biteActive);
-    ctx.restore();
+    function drawCat(w, h, berserk, biting) {
+    const img = new Image();
+    img.src = 'https://Alan869521.github.io/cat_game/black.png';          // ← 放圖片URL
+    ctx.drawImage(img, -w/2, -h/2, w, h); // 畫出來
+    return; // 加這行，後面原本的幾何圖形就不會畫
+    }
   }
 
   // 撕咬圓形指示
