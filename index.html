@@ -66,6 +66,11 @@ const canvas = document.getElementById('game');
 const ctx    = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
 
+// 在這裡預先建立圖片物件
+const catImg = new Image();
+catImg.src = 'https://Alan869521.github.io/cat_game/black.png'; 
+// 這裡可以換成你剛才處理好的去背圖連結
+
 let state, player, bullets, enemies, drops, particles, bloodSplats, stars;
 
 function initGame() {
