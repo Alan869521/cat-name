@@ -66,10 +66,10 @@ const canvas = document.getElementById('game');
 const ctx    = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
 
-// 在這裡預先建立圖片物件
+// --- 圖片預載入區 ---
 const catImg = new Image();
-catImg.src = 'https://Alan869521.github.io/cat_game/black.png'; 
-// 這裡可以換成你剛才處理好的去背圖連結
+// 這裡確保連結正確。如果圖片還沒上傳到這個路徑，它會自動跑「備案」畫出原本的圓形貓
+catImg.src = 'https://alan869521.github.io/cat_game/black.png'; 
 
 let state, player, bullets, enemies, drops, particles, bloodSplats, stars;
 
@@ -95,6 +95,7 @@ function initGame() {
   }));
 }
 
+// --- 事件監聽 ---
 const keys = {};
 document.addEventListener('keydown', e => {
   keys[e.code]=true;
@@ -105,11 +106,13 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => keys[e.code]=false);
 
+// --- 工具函數 ---
 function rand(a,b){return Math.random()*(b-a)+a;}
 function randInt(a,b){return Math.floor(rand(a,b+1));}
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
 function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
 
+// --- 遊戲邏輯 ---
 function tryShoot(){
   if(player.fireCooldown>0||state.over||state.paused) return;
   const sz=player.boneSize, n=player.boneCount;
@@ -163,8 +166,8 @@ function killEnemy(e){
 }
 
 const ETYPES={
-  mouse:     {hp:2, speed:1.3, w:28,h:22,color:'#998877'},
-  bigMouse:  {hp:6, speed:0.65,w:44,h:36,color:'#776655'},
+  mouse:      {hp:2, speed:1.3, w:28,h:22,color:'#998877'},
+  bigMouse:   {hp:6, speed:0.65,w:44,h:36,color:'#776655'},
   speedMouse:{hp:1, speed:2.8, w:22,h:18,color:'#bbaa99'}
 };
 
@@ -235,7 +238,6 @@ function update(){
   state.shakeY=state.shake>0?rand(-state.shake*0.4,state.shake*0.4):0;
   if(state.berserk>0) state.berserk--;
 
-  // 玩家移動
   if(keys['ArrowLeft'] ||keys['KeyA']) player.x-=player.speed;
   if(keys['ArrowRight']||keys['KeyD']) player.x+=player.speed;
   if(keys['ArrowUp']   ||keys['KeyW']) player.y-=player.speed*0.8;
@@ -254,11 +256,9 @@ function update(){
   player.biteCooldown=Math.max(0,player.biteCooldown-1);
   if(player.invincible>0) player.invincible--;
 
-  // 子彈
   bullets=bullets.filter(b=>b.y>-40&&b.x>-40&&b.x<W+40);
   bullets.forEach(b=>{b.x+=b.vx;b.y+=b.vy;});
 
-  // 敵人生成
   state.spawnTimer++;
   const interval=Math.max(35,state.spawnInterval-player.level*3);
   if(state.spawnTimer>=interval){
@@ -267,7 +267,6 @@ function update(){
     if(player.level>=4&&Math.random()<0.3) spawnEnemy();
   }
 
-  // 敵人移動
   enemies.forEach(e=>{
     if(e.dead) return;
     e.moveTimer++;
@@ -280,7 +279,6 @@ function update(){
     if(e.flashTimer>0) e.flashTimer--;
   });
 
-  // 子彈 vs 敵人
   bullets.forEach((b,bi)=>{
     enemies.forEach(e=>{
       if(e.dead) return;
@@ -292,12 +290,10 @@ function update(){
     });
   });
 
-  // 撕咬範圍（動畫期間）
   if(player.biteActive&&state.frame%6===0){
     enemies.forEach(e=>{if(!e.dead&&dist(player,e)<80) doHitEnemy(e,9999,true);});
   }
 
-  // 敵人 vs 玩家
   if(player.invincible===0&&state.berserk===0){
     enemies.forEach(e=>{
       if(e.dead) return;
@@ -307,32 +303,26 @@ function update(){
     });
   }
 
-  // 掉落物
   drops=drops.filter(d=>d.life>0&&d.y<H+50);
   drops.forEach(d=>{
     d.bob++;d.y+=d.vy;d.life--;
     if(dist(player,d)<28){collectDrop(d);d.life=0;}
   });
 
-  // 粒子
   particles=particles.filter(p=>p.life>0);
   particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vx*=0.93;p.vy*=0.93;p.life--;});
 
-  // 血跡
   bloodSplats=bloodSplats.filter(b=>b.life>0);
   bloodSplats.forEach(b=>b.life--);
 
-  // 清除死亡敵人
   enemies=enemies.filter(e=>(!e.dead)&&e.y<H+80);
 
-  // 星星
   stars.forEach(s=>{
     s.y+=s.speed;
     s.bright=0.4+0.6*Math.abs(Math.sin(state.frame*0.02+s.x));
     if(s.y>H){s.y=0;s.x=Math.random()*W;}
   });
 
-  // 升等
   if(player.exp>=player.expNext){
     player.exp-=player.expNext;
     player.level++;
@@ -377,6 +367,33 @@ function collectDrop(d){
 }
 
 // ─── 繪製 ───────────────────────────────────────────
+
+function drawCat(w, h, berserk, biting) {
+    ctx.save();
+    if (berserk) {
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#4488ff";
+        ctx.filter = "brightness(1.2) sepia(0.5) hue-rotate(180deg)";
+    }
+    
+    // 優先使用圖片
+    if (catImg.complete && catImg.naturalWidth !== 0) {
+        ctx.drawImage(catImg, -w/2, -h/2, w, h);
+    } else {
+        // 如果圖片讀不到，畫一個原本的黃色圓形
+        ctx.fillStyle = berserk ? '#5599ff' : '#e8c87a';
+        ctx.beginPath(); 
+        ctx.ellipse(0, 0, w/2, h/2, 0, 0, Math.PI*2); 
+        ctx.fill();
+        // 畫耳朵
+        ctx.fillStyle = berserk ? '#5599ff' : '#e8c87a';
+        [[-w*0.3,-h*0.4],[w*0.3,-h*0.4]].forEach(([ex,ey])=>{
+            ctx.beginPath(); ctx.moveTo(ex,ey); ctx.lineTo(ex-5,ey-10); ctx.lineTo(ex+5,ey-10); ctx.closePath(); ctx.fill();
+        });
+    }
+    ctx.restore();
+}
+
 function draw(){
   ctx.save();
   ctx.translate(state.shakeX,state.shakeY);
@@ -427,7 +444,7 @@ function draw(){
     ctx.restore();
   });
 
-  // 子彈魚骨
+  // 子彈
   bullets.forEach(b=>drawBone(b));
 
   // 尾跡
@@ -438,19 +455,16 @@ function draw(){
   });
   ctx.globalAlpha=1;
 
-  // 玩家
-  const blink=player.invincible>0&&Math.floor(state.frame/5)%2===0;
+  // 玩家 (這裡就是畫貓的地方)
+  const blink = player.invincible > 0 && Math.floor(state.frame/5)%2===0;
   if(!blink){
-    ctx.save(); ctx.translate(player.x,player.y);
-    function drawCat(w, h, berserk, biting) {
-    const img = new Image();
-    img.src = 'https://Alan869521.github.io/cat_game/black.png';          // ← 放圖片URL
-    ctx.drawImage(img, -w/2, -h/2, w, h); // 畫出來
-    return; // 加這行，後面原本的幾何圖形就不會畫
-    }
+    ctx.save(); 
+    ctx.translate(player.x, player.y);
+    drawCat(player.w, player.h, state.berserk > 0, player.biteActive);
+    ctx.restore();
   }
 
-  // 撕咬圓形指示
+  // 撕咬指示器
   if(player.biteCooldown>75&&player.biteCooldown<90){
     ctx.save();
     ctx.globalAlpha=(player.biteCooldown-75)/15*0.3;
@@ -481,64 +495,7 @@ function draw(){
   if(state.over)   drawOverlay('GAME OVER',`得分：${state.score}　按 Enter 重試`,'#ff3333');
 }
 
-function drawCat(w,h,berserk,biting){
-  const col=berserk?'#5599ff':'#e8c87a';
-  const dark=berserk?'#3377dd':'#c4a055';
-
-  ctx.fillStyle=col;
-  ctx.beginPath(); ctx.ellipse(0,0,w/2,h/2,0,0,Math.PI*2); ctx.fill();
-
-  // 耳朵
-  [[-w*0.35,-h*0.45],[w*0.35,-h*0.45]].forEach(([ex,ey])=>{
-    ctx.fillStyle=col;
-    ctx.beginPath(); ctx.moveTo(ex,ey); ctx.lineTo(ex-8,ey-18); ctx.lineTo(ex+8,ey-18); ctx.closePath(); ctx.fill();
-    ctx.fillStyle='#ffaaaa';
-    ctx.beginPath(); ctx.moveTo(ex,ey-2); ctx.lineTo(ex-4,ey-13); ctx.lineTo(ex+4,ey-13); ctx.closePath(); ctx.fill();
-  });
-
-  // 眼睛
-  if(berserk){
-    ctx.fillStyle='#ff2222';
-    [-8,8].forEach(ox=>{ctx.beginPath();ctx.ellipse(ox,-5,5,6,0,0,Math.PI*2);ctx.fill();});
-  } else if(biting){
-    ctx.fillStyle='#333';
-    [-8,8].forEach(ox=>{ctx.fillRect(ox-5,-7,10,4);});
-  } else {
-    ctx.fillStyle='#333';
-    [-8,8].forEach(ox=>{ctx.beginPath();ctx.ellipse(ox,-5,4,5,0,0,Math.PI*2);ctx.fill();});
-    ctx.fillStyle='#fff';
-    [-8,8].forEach(ox=>{ctx.beginPath();ctx.arc(ox+1,-6,1.5,0,Math.PI*2);ctx.fill();});
-  }
-
-  // 鼻子
-  ctx.fillStyle='#ff8888'; ctx.beginPath(); ctx.arc(0,1,2.5,0,Math.PI*2); ctx.fill();
-
-  // 嘴巴
-  ctx.strokeStyle='#994444'; ctx.lineWidth=1.5;
-  if(biting){
-    ctx.beginPath(); ctx.arc(0,3,8,0,Math.PI); ctx.stroke();
-    ctx.fillStyle='#ffffff';
-    [-4,0,4].forEach(ox=>{ctx.fillRect(ox-2,3,4,5);});
-  } else {
-    ctx.beginPath(); ctx.arc(0,2,5,0.1,Math.PI-0.1); ctx.stroke();
-  }
-
-  // 鬍鬚
-  ctx.strokeStyle=dark; ctx.lineWidth=1;
-  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy],i)=>{
-    const side=i<2?-1:1;
-    ctx.beginPath(); ctx.moveTo(side*8,2); ctx.lineTo(side*26,2+sy*4); ctx.stroke();
-  });
-
-  // 尾巴
-  ctx.strokeStyle=dark; ctx.lineWidth=5; ctx.lineCap='round';
-  const t=state.frame*0.05;
-  ctx.beginPath();
-  ctx.moveTo(w*0.4,h*0.2);
-  ctx.bezierCurveTo(w*0.8,h*0.5,w*0.9+Math.cos(t)*12,Math.sin(t)*15,w*0.7+Math.cos(t)*18,-h*0.3+Math.sin(t)*10);
-  ctx.stroke();
-}
-
+// 其餘繪圖輔助函數
 function drawBone(b){
   const bs=state.berserk>0;
   ctx.save();
@@ -580,26 +537,22 @@ function drawMouse(w,h,type,color){
 
 function drawHUD(){
   ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,0,W,56);
-
   ctx.fillStyle='#ffdddd'; ctx.font='bold 13px Microsoft JhengHei';
   ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillText('HP',10,8);
   for(let i=0;i<player.maxHp;i++){
     ctx.fillStyle=i<player.hp?'#ff4444':'#441111';
     ctx.beginPath(); ctx.arc(42+i*18,14,7,0,Math.PI*2); ctx.fill();
   }
-
   ctx.font='13px serif'; ctx.fillText('🥫',10,30);
   for(let i=0;i<5;i++){
     ctx.fillStyle=i<player.cans?'#ff8844':'#442211';
     ctx.fillRect(32+i*16,31,12,10);
     ctx.strokeStyle='#000'; ctx.lineWidth=0.5; ctx.strokeRect(32+i*16,31,12,10);
   }
-
   ctx.fillStyle='#ffdd44'; ctx.font='bold 14px Microsoft JhengHei';
   ctx.textAlign='right'; ctx.textBaseline='top'; ctx.fillText(`LV.${player.level}`,W-10,8);
   ctx.fillStyle='#ffffff'; ctx.font='13px Microsoft JhengHei';
   ctx.fillText(`${state.score} pts`,W-10,28);
-
   ctx.fillStyle='#222'; ctx.fillRect(0,50,W,6);
   const ep=player.exp/player.expNext;
   const eg=ctx.createLinearGradient(0,0,W*ep,0);
@@ -615,7 +568,6 @@ function drawHUD(){
     ctx.textAlign='center'; ctx.textBaseline='top';
     ctx.fillText(`🥛 無敵狂暴！剩餘 ${Math.ceil(state.berserk/60)} 秒`,W/2,78);
   }
-
   if(player.biteCooldown>0){
     const pct=1-player.biteCooldown/90;
     ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(10,H-26,100,12);
