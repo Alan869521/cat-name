@@ -66,11 +66,10 @@ const canvas = document.getElementById('game');
 const ctx    = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
 
-// --- 圖片預載入區 ---
+// --- 圖片預載入 ---
 const catImg = new Image();
-// 這裡確保連結正確。如果圖片還沒上傳到這個路徑，它會自動跑「備案」畫出原本的圓形貓
-catImg.src = 'https://alan869521.github.io/cat_game/black.png'; 
-
+// 👉 修改這裡！使用「相對路徑」指向你 assets 資料夾裡的檔案
+catImg.src = 'assets/my_cat.png';
 let state, player, bullets, enemies, drops, particles, bloodSplats, stars;
 
 function initGame() {
