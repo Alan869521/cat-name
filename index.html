@@ -70,8 +70,19 @@ const W = canvas.width, H = canvas.height;
 const catImg = new Image();
 // 👉 修改這裡！使用「相對路徑」指向你 assets 資料夾裡的檔案
 catImg.src = 'assets/black.png';
+
 let state, player, bullets, enemies, drops, particles, bloodSplats, stars;
 
+// 👉 新增：專業圖片比例預載入器
+catImg.onload = function() {
+  const targetWidth = 46; // 我們設定角色寬度不變
+  const ratio = this.naturalHeight / this.naturalWidth; // 計算「原始比例」
+  
+  // 修正 player 預設值，讓高度根據寬度自適應
+  player.h = targetWidth * ratio; // 均勻拉伸，保證不變形
+  console.log(`Cat Image Loaded. Size: ${this.naturalWidth}x${this.naturalHeight}. ` +
+              `Setting game size to: ${player.w}x${player.h}`);
+};
 function initGame() {
   state = { frame:0, score:0, paused:false, over:false,
             shake:0, shakeX:0, shakeY:0,
@@ -369,6 +380,9 @@ function collectDrop(d){
 
 function drawCat(w, h, berserk, biting) {
     ctx.save();
+    // 👉 新增：專業級畫質平滑化 (抗鋸齒)
+    ctx.imageSmoothingEnabled = true; // 開啟圖片平滑化
+    ctx.imageSmoothingQuality = 'high'; // 設定最高平滑畫質
     if (berserk) {
         ctx.shadowBlur = 15;
         ctx.shadowColor = "#4488ff";
