@@ -70,7 +70,6 @@
         .info-value { font-size: 22px; font-weight: bold; color: #fff; }
         .hp-value { color: #ff416c; font-size: 14px; word-break: break-all; }
 
-        /* 控制說明樣式 */
         .how-to-play { 
             margin-top: 10px; padding-top: 10px; border-top: 1px solid #444; 
             font-size: 13px; color: #aaa; line-height: 1.6;
@@ -167,20 +166,23 @@
     let score = 0, currentLevel = 1, hp = 9, ultEnergy = 0;
     let isUltActive = false, ultTimer = 0, gameActive = false;
     let screenShake = 0, hurtTimer = 0;
-    // 修正黑貓比例: w 90, h 110
     let player = { x: 260, y: 550, w: 90, h: 110, isBiting: false, biteTimer: 0, shootTimer: 0 };
     let enemies = [], bullets = [], particles = [];
     let keys = {};
     const imgStore = {};
 
-    // 裝置更新率同步修正變數
     let lastTime = 0;
     const fps = 60; 
     const interval = 1000 / fps;
 
+    // 修復音效播放函數，確保大招音效能正確觸發
     function playSound(id) {
         const s = document.getElementById(id);
-        if(s) { s.currentTime = 0; s.play().catch(()=>{}); }
+        if(s) { 
+            s.pause();
+            s.currentTime = 0; 
+            s.play().catch(e => console.log("音效播放受阻:", e)); 
+        }
     }
 
     function openMenu() {
@@ -194,14 +196,13 @@
         document.getElementById('menuOverlay').style.display = 'flex';
         score = 0; currentLevel = 1; hp = 9; ultEnergy = 0;
         enemies = []; bullets = []; particles = [];
-        isUltActive = false; // 強制關閉大招狀態
+        isUltActive = false;
     }
 
     function select(type, val, btn) {
         config[type] = val;
         Array.from(btn.parentNode.children).forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        
         if(type==='cat') {
             document.getElementById('pre-cat').src = `assets/${val}.png`;
             document.getElementById('pre-bite').src = `assets/${val}_bite.png`;
@@ -243,17 +244,14 @@
         document.getElementById('ultCutIn').src = `assets/${config.cat}_bite.png`;
 
         gameActive = true;
-        ultEnergy = 0; // 確保進遊戲能量從 0 開始
+        ultEnergy = 0; 
         window.onkeydown = e => keys[e.code] = true;
         window.onkeyup = e => keys[e.code] = false;
         
-        // 重置 FPS 計時器
         lastTime = performance.now();
         function loop(timestamp) {
             if(!gameActive) return;
-
             const elapsed = timestamp - lastTime;
-
             if (elapsed > interval) {
                 lastTime = timestamp - (elapsed % interval);
                 update();
@@ -267,15 +265,22 @@
     function update() {
         if(screenShake > 0) screenShake--;
         if(hurtTimer > 0) hurtTimer--;
-        if(!isUltActive && ultEnergy < 100) ultEnergy += 0.25;
+        
+        // 微調能量累積速度 (0.4 使節奏更順)
+        if(!isUltActive && ultEnergy < 100) ultEnergy += 0.4;
         document.getElementById('ultBarFill').style.height = ultEnergy + '%';
+
+        // 大招觸發邏輯：加上音效播放
         if((keys['ShiftLeft'] || keys['ShiftRight']) && ultEnergy >= 100 && !isUltActive) {
-            isUltActive = true; ultTimer = 180; ultEnergy = 0;
-            playSound('ult_roar');
+            isUltActive = true; 
+            ultTimer = 180; 
+            ultEnergy = 0;
+            playSound('ult_roar'); // 觸發咆哮音效
             const cutIn = document.getElementById('ultCutIn');
             cutIn.classList.add('active');
             setTimeout(() => cutIn.classList.remove('active'), 800);
         }
+
         if(keys['ArrowLeft'] && player.x > 0) player.x -= 8;
         if(keys['ArrowRight'] && player.x < 600 - player.w) player.x += 8;
         if(keys['ArrowUp'] && player.y > 0) player.y -= 8;
