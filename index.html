@@ -94,7 +94,7 @@
 <audio id="meow_black"><source src="assets/meow_black.mp3" type="audio/mpeg"></audio>
 <audio id="meow_orange"><source src="assets/meow_orange.mp3" type="audio/mpeg"></audio>
 <audio id="meow_white"><source src="assets/meow_white.mp3" type="audio/mpeg"></audio>
-<audio id="ult_roar"><source src="assets/ult_sound.mp3" type="audio/mpeg"></audio>
+<audio id="ult_roar"><source src="assets/ult_sound.MP3" type="audio/mpeg"></audio>
 
 <div id="titleScreen">
     <div class="vertical-title">喵不可言</div>
@@ -141,11 +141,11 @@
         <div><div class="info-label">Score</div><div id="scrTxt" class="info-value">000000</div></div>
         
         <div class="how-to-play">
-            <div class="info-label" style="color: #f8b500;">操作說明</div>
+            <div class="info-label" style="color: #f8b500;">遊戲操作</div>
             <div><b>↑↓←→</b>：移動</div>
             <div><b>Space</b>：撕咬</div>
-            <div><b>Z</b>：發射武器</div>
-            <div><b>Shift</b>：放大招</div>
+            <div><b>Z 鍵</b>：武器發射</div>
+            <div><b>Shift</b>：大招</div>
         </div>
 
         <div style="margin-top:auto">
@@ -176,11 +176,11 @@
     const fps = 60; 
     const interval = 1000 / fps;
 
-    // 音效播放優化，確保大招音效能正確觸發
+    // 音效播放優化
     function playSound(id) {
         const s = document.getElementById(id);
         if(s) { 
-            s.pause(); // 先停止
+            s.pause(); 
             s.currentTime = 0; 
             s.play().catch(e => console.log("音效播不出來可能是瀏覽器限制:", e)); 
         }
@@ -274,7 +274,7 @@
             isUltActive = true; 
             ultTimer = 180; 
             ultEnergy = 0;
-            playSound('ult_roar'); // 播放大招聲音
+            playSound('ult_roar'); // 修正播放
             const cutIn = document.getElementById('ultCutIn');
             cutIn.classList.add('active');
             setTimeout(() => cutIn.classList.remove('active'), 800);
