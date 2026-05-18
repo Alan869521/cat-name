@@ -70,7 +70,7 @@
         .info-value { font-size: 22px; font-weight: bold; color: #fff; }
         .hp-value { color: #ff416c; font-size: 14px; word-break: break-all; }
 
-        /* 操作說明樣式 */
+        /* 操作說明 */
         .how-to-play { 
             margin-top: 10px; padding-top: 10px; border-top: 1px solid #444; 
             font-size: 13px; color: #aaa; line-height: 1.6;
@@ -141,11 +141,11 @@
         <div><div class="info-label">Score</div><div id="scrTxt" class="info-value">000000</div></div>
         
         <div class="how-to-play">
-            <div class="info-label" style="color: #f8b500;">遊戲操作</div>
+            <div class="info-label" style="color: #f8b500;">操作說明</div>
             <div><b>↑↓←→</b>：移動</div>
             <div><b>Space</b>：撕咬</div>
-            <div><b>Z 鍵</b>：武器發射</div>
-            <div><b>Shift</b>：大招</div>
+            <div><b>Z</b>：發射武器</div>
+            <div><b>Shift</b>：放大招</div>
         </div>
 
         <div style="margin-top:auto">
@@ -176,19 +176,30 @@
     const fps = 60; 
     const interval = 1000 / fps;
 
-    // 音效播放優化
+    // 音效播放核心邏輯
     function playSound(id) {
         const s = document.getElementById(id);
         if(s) { 
-            s.pause(); 
+            s.pause();
             s.currentTime = 0; 
-            s.play().catch(e => console.log("音效播不出來可能是瀏覽器限制:", e)); 
+            // 嘗試播放並處理瀏覽器阻擋
+            let playPromise = s.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.log("音效被瀏覽器攔截，請確保點擊過頁面。");
+                });
+            }
         }
     }
 
     function openMenu() {
         document.getElementById('titleScreen').style.display = 'none';
         document.getElementById('menuOverlay').style.display = 'flex';
+        // 使用者點擊「開始」後，嘗試解鎖所有音效
+        ['bgm', 'hitSound', 'meow_black', 'meow_orange', 'meow_white', 'ult_roar'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) { el.play().then(() => el.pause()).catch(() => {}); }
+        });
     }
 
     function backToMenu() {
@@ -269,12 +280,12 @@
         if(!isUltActive && ultEnergy < 100) ultEnergy += 0.25;
         document.getElementById('ultBarFill').style.height = ultEnergy + '%';
 
-        // 觸發大招處
+        // 觸發大招
         if((keys['ShiftLeft'] || keys['ShiftRight']) && ultEnergy >= 100 && !isUltActive) {
             isUltActive = true; 
             ultTimer = 180; 
             ultEnergy = 0;
-            playSound('ult_roar'); // 修正播放
+            playSound('ult_roar'); // 這裡觸發音效
             const cutIn = document.getElementById('ultCutIn');
             cutIn.classList.add('active');
             setTimeout(() => cutIn.classList.remove('active'), 800);
