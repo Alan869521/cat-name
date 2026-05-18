@@ -93,7 +93,7 @@
 <audio id="meow_black"><source src="assets/meow_black.mp3" type="audio/mpeg"></audio>
 <audio id="meow_orange"><source src="assets/meow_orange.mp3" type="audio/mpeg"></audio>
 <audio id="meow_white"><source src="assets/meow_white.mp3" type="audio/mpeg"></audio>
-<audio id="ult_roar"><source src="assets/ult_sound.mp3" type="audio/mpeg"></audio>
+<audio id="ult_roar"><source src="assets/ult_sound.MP3" type="audio/mpeg"></audio>
 
 <div id="titleScreen">
     <div class="vertical-title">喵不可言</div>
@@ -175,13 +175,12 @@
     const fps = 60; 
     const interval = 1000 / fps;
 
-    // 修復音效播放函數，確保大招音效能正確觸發
     function playSound(id) {
         const s = document.getElementById(id);
         if(s) { 
-            s.pause();
+            s.pause(); // 先停止當前播放
             s.currentTime = 0; 
-            s.play().catch(e => console.log("音效播放受阻:", e)); 
+            s.play().catch(e => console.error("音效播放失敗:", id, e)); 
         }
     }
 
@@ -266,16 +265,15 @@
         if(screenShake > 0) screenShake--;
         if(hurtTimer > 0) hurtTimer--;
         
-        // 微調能量累積速度 (0.4 使節奏更順)
         if(!isUltActive && ultEnergy < 100) ultEnergy += 0.4;
         document.getElementById('ultBarFill').style.height = ultEnergy + '%';
 
-        // 大招觸發邏輯：加上音效播放
+        // 觸發大招
         if((keys['ShiftLeft'] || keys['ShiftRight']) && ultEnergy >= 100 && !isUltActive) {
             isUltActive = true; 
             ultTimer = 180; 
             ultEnergy = 0;
-            playSound('ult_roar'); // 觸發咆哮音效
+            playSound('ult_roar'); // 呼叫播放函數
             const cutIn = document.getElementById('ultCutIn');
             cutIn.classList.add('active');
             setTimeout(() => cutIn.classList.remove('active'), 800);
