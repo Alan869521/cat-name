@@ -87,7 +87,7 @@
 <audio id="meow_black"><source src="assets/meow_black.mp3" type="audio/mpeg"></audio>
 <audio id="meow_orange"><source src="assets/meow_orange.mp3" type="audio/mpeg"></audio>
 <audio id="meow_white"><source src="assets/meow_white.mp3" type="audio/mpeg"></audio>
-<audio id="ult_roar"><source src="assets/ult_sound.MP3" type="audio/mpeg"></audio>
+<audio id="ult_roar"><source src="assets/ult_sound.mp3" type="audio/mpeg"></audio>
 
 <div id="titleScreen">
     <div class="vertical-title">喵不可言</div>
@@ -145,14 +145,19 @@
 
 <script>
     let config = { cat: 'black', wp: 'hand', bg: 'lawn' };
-    let score = 0, currentLevel = 1, hp = 9, ultEnergy = 0; // 大招初始為 0
+    let score = 0, currentLevel = 1, hp = 9, ultEnergy = 0;
     let isUltActive = false, ultTimer = 0, gameActive = false;
     let screenShake = 0, hurtTimer = 0;
-    // 修正：黑貓比例 w:90 h:110 (不再是正方形 85x85)
-    let player = { x: 255, y: 550, w: 90, h: 110, isBiting: false, biteTimer: 0, shootTimer: 0 };
+    // 修正黑貓比例: w 90, h 110
+    let player = { x: 260, y: 550, w: 90, h: 110, isBiting: false, biteTimer: 0, shootTimer: 0 };
     let enemies = [], bullets = [], particles = [];
     let keys = {};
     const imgStore = {};
+
+    // 裝置更新率同步修正變數
+    let lastTime = 0;
+    const fps = 60; 
+    const interval = 1000 / fps;
 
     function playSound(id) {
         const s = document.getElementById(id);
@@ -168,13 +173,9 @@
         document.getElementById('resultOverlay').style.display = 'none';
         document.getElementById('gameWrapper').style.display = 'none';
         document.getElementById('menuOverlay').style.display = 'flex';
-        // 重置所有遊戲數據
         score = 0; currentLevel = 1; hp = 9; ultEnergy = 0;
-        isUltActive = false; ultTimer = 0;
         enemies = []; bullets = []; particles = [];
-        player.x = 255; player.y = 550;
-        document.getElementById('hpTxt').innerText = "♥♥♥♥♥♥♥♥♥";
-        document.getElementById('scrTxt').innerText = "000000";
+        isUltActive = false; // 強制關閉大招狀態
     }
 
     function select(type, val, btn) {
@@ -223,25 +224,32 @@
         document.getElementById('ultCutIn').src = `assets/${config.cat}_bite.png`;
 
         gameActive = true;
+        ultEnergy = 0; // 確保進遊戲能量從 0 開始
         window.onkeydown = e => keys[e.code] = true;
         window.onkeyup = e => keys[e.code] = false;
         
-        function loop() {
+        // 重置 FPS 計時器
+        lastTime = performance.now();
+        function loop(timestamp) {
             if(!gameActive) return;
-            update();
-            draw(ctx, canvas);
+
+            const elapsed = timestamp - lastTime;
+
+            if (elapsed > interval) {
+                lastTime = timestamp - (elapsed % interval);
+                update();
+                draw(ctx, canvas);
+            }
             requestAnimationFrame(loop);
         }
-        loop();
+        requestAnimationFrame(loop);
     }
 
     function update() {
         if(screenShake > 0) screenShake--;
         if(hurtTimer > 0) hurtTimer--;
-        // 只有非大招狀態才累計能量，且不會開局就滿
         if(!isUltActive && ultEnergy < 100) ultEnergy += 0.25;
         document.getElementById('ultBarFill').style.height = ultEnergy + '%';
-        
         if((keys['ShiftLeft'] || keys['ShiftRight']) && ultEnergy >= 100 && !isUltActive) {
             isUltActive = true; ultTimer = 180; ultEnergy = 0;
             playSound('ult_roar');
@@ -254,14 +262,14 @@
         if(keys['ArrowUp'] && player.y > 0) player.y -= 8;
         if(keys['ArrowDown'] && player.y < 700 - player.h) player.y += 8;
         if(keys['KeyZ'] && player.shootTimer === 0) {
-            bullets.push({ x: player.x+(player.w/2-12), y: player.y, w:25, h:35, vx:0, vy:-15 });
+            bullets.push({ x: player.x+30, y: player.y, w:25, h:35, vx:0, vy:-15 });
             player.shootTimer = 10;
         }
         if(player.shootTimer > 0) player.shootTimer--;
         if(isUltActive) {
             ultTimer--; screenShake = 2;
             if(ultTimer % 4 === 0) {
-                for(let i=-2; i<=2; i++) bullets.push({ x: player.x+(player.w/2-15), y: player.y, w:35, h:45, vx:i*6, vy:-20, isUlt:true });
+                for(let i=-2; i<=2; i++) bullets.push({ x: player.x+30, y: player.y, w:35, h:45, vx:i*6, vy:-20, isUlt:true });
             }
             if(ultTimer <= 0) isUltActive = false;
         }
@@ -291,7 +299,7 @@
                     }
                 }
             });
-            if(player.isBiting && Math.hypot((player.x+player.w/2)-(en.x+en.w/2), (player.y+player.h/2)-(en.y+en.h/2)) < 110) {
+            if(player.isBiting && Math.hypot((player.x+40)-(en.x+en.w/2), (player.y+40)-(en.y+en.h/2)) < 110) {
                 spawnBlood(en.x+en.w/2, en.y+en.h/2, 40, true);
                 enemies.splice(ei, 1); score += 50; screenShake = 20;
                 playSound('hitSound');
