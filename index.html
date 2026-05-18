@@ -87,7 +87,7 @@
         .thanks-msg { color: #f8b500; font-size: 24px; margin: 20px 0; font-weight: bold; }
     </style>
 </head>
-<body onclick="document.getElementById('bgm').play()">
+<body onclick="startBGM()">
 
 <audio id="bgm" loop><source src="assets/bgm.MP3" type="audio/mpeg"></audio>
 <audio id="hitSound"><source src="assets/hit.mp3" type="audio/mpeg"></audio>
@@ -176,29 +176,39 @@
     const fps = 60; 
     const interval = 1000 / fps;
 
-    // 音效播放核心邏輯
+    // 強制啟動 BGM
+    function startBGM() {
+        const bgm = document.getElementById('bgm');
+        if (bgm.paused) {
+            bgm.play().catch(e => console.log("BGM 啟動失敗"));
+        }
+    }
+
     function playSound(id) {
         const s = document.getElementById(id);
         if(s) { 
             s.pause();
             s.currentTime = 0; 
-            // 嘗試播放並處理瀏覽器阻擋
-            let playPromise = s.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(error => {
-                    console.log("音效被瀏覽器攔截，請確保點擊過頁面。");
-                });
-            }
+            s.play().catch(e => {});
         }
     }
 
     function openMenu() {
         document.getElementById('titleScreen').style.display = 'none';
         document.getElementById('menuOverlay').style.display = 'flex';
-        // 使用者點擊「開始」後，嘗試解鎖所有音效
-        ['bgm', 'hitSound', 'meow_black', 'meow_orange', 'meow_white', 'ult_roar'].forEach(id => {
+        
+        // 點擊開始時，確保 BGM 播放
+        startBGM();
+
+        // 靜音解鎖其他音效 (但不干擾 BGM)
+        ['hitSound', 'meow_black', 'meow_orange', 'meow_white', 'ult_roar'].forEach(id => {
             const el = document.getElementById(id);
-            if(el) { el.play().then(() => el.pause()).catch(() => {}); }
+            if(el) {
+                let p = el.play();
+                if(p !== undefined) {
+                    p.then(() => { el.pause(); el.currentTime = 0; }).catch(() => {});
+                }
+            }
         });
     }
 
@@ -209,6 +219,7 @@
         score = 0; currentLevel = 1; hp = 9; ultEnergy = 0;
         enemies = []; bullets = []; particles = [];
         isUltActive = false;
+        startBGM(); // 確保回來時 BGM 還在
     }
 
     function select(type, val, btn) {
@@ -280,12 +291,11 @@
         if(!isUltActive && ultEnergy < 100) ultEnergy += 0.25;
         document.getElementById('ultBarFill').style.height = ultEnergy + '%';
 
-        // 觸發大招
         if((keys['ShiftLeft'] || keys['ShiftRight']) && ultEnergy >= 100 && !isUltActive) {
             isUltActive = true; 
             ultTimer = 180; 
             ultEnergy = 0;
-            playSound('ult_roar'); // 這裡觸發音效
+            playSound('ult_roar'); 
             const cutIn = document.getElementById('ultCutIn');
             cutIn.classList.add('active');
             setTimeout(() => cutIn.classList.remove('active'), 800);
