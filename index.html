@@ -70,6 +70,7 @@
         .info-value { font-size: 22px; font-weight: bold; color: #fff; }
         .hp-value { color: #ff416c; font-size: 14px; word-break: break-all; }
 
+        /* 操作說明樣式 */
         .how-to-play { 
             margin-top: 10px; padding-top: 10px; border-top: 1px solid #444; 
             font-size: 13px; color: #aaa; line-height: 1.6;
@@ -93,7 +94,7 @@
 <audio id="meow_black"><source src="assets/meow_black.mp3" type="audio/mpeg"></audio>
 <audio id="meow_orange"><source src="assets/meow_orange.mp3" type="audio/mpeg"></audio>
 <audio id="meow_white"><source src="assets/meow_white.mp3" type="audio/mpeg"></audio>
-<audio id="ult_roar"><source src="assets/ult_sound.MP3" type="audio/mpeg"></audio>
+<audio id="ult_roar"><source src="assets/ult_sound.mp3" type="audio/mpeg"></audio>
 
 <div id="titleScreen">
     <div class="vertical-title">喵不可言</div>
@@ -175,12 +176,13 @@
     const fps = 60; 
     const interval = 1000 / fps;
 
+    // 音效播放優化，確保大招音效能正確觸發
     function playSound(id) {
         const s = document.getElementById(id);
         if(s) { 
-            s.pause(); // 先停止當前播放
+            s.pause(); // 先停止
             s.currentTime = 0; 
-            s.play().catch(e => console.error("音效播放失敗:", id, e)); 
+            s.play().catch(e => console.log("音效播不出來可能是瀏覽器限制:", e)); 
         }
     }
 
@@ -264,16 +266,15 @@
     function update() {
         if(screenShake > 0) screenShake--;
         if(hurtTimer > 0) hurtTimer--;
-        
-        if(!isUltActive && ultEnergy < 100) ultEnergy += 0.4;
+        if(!isUltActive && ultEnergy < 100) ultEnergy += 0.25;
         document.getElementById('ultBarFill').style.height = ultEnergy + '%';
 
-        // 觸發大招
+        // 觸發大招處
         if((keys['ShiftLeft'] || keys['ShiftRight']) && ultEnergy >= 100 && !isUltActive) {
             isUltActive = true; 
             ultTimer = 180; 
             ultEnergy = 0;
-            playSound('ult_roar'); // 呼叫播放函數
+            playSound('ult_roar'); // 播放大招聲音
             const cutIn = document.getElementById('ultCutIn');
             cutIn.classList.add('active');
             setTimeout(() => cutIn.classList.remove('active'), 800);
@@ -360,6 +361,7 @@
             ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
         });
         enemies.forEach(en => {
+            if(en.flash > 0) en.flash--;
             if(en.flash > 0) ctx.filter = "brightness(3)";
             ctx.drawImage(imgStore[en.type], en.x, en.y, en.w, en.h);
             ctx.filter = "none";
